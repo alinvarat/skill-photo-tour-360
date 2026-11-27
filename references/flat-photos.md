@@ -17,8 +17,9 @@ Use this when the property has only normal photos, for example on its Facebook p
 ## 2. Choose places and photos
 - One place = 3 to 5 photos of the same spot taken from different angles. Skip photos with text overlays, people, or a red circle or arrow drawn on them.
 - Do not mix day and night photos in one place.
-- Put the best photo at `u: 0.5` (the arrival view). Space neighbours about 0.17 to 0.19 apart (one photo width), so turning moves from one photo straight into the next. A bathroom or a view out of the window can sit further round.
-- A tall facade can use `"v": 0.44, "hfov": 48` to show the whole building.
+- Use at most 4 photos per place. The script draws each photo wider than the real lens (90° landscape, 70° portrait) so it fills a phone screen from top to bottom; 4 photos then go most of the way round.
+- Put the best photo at `u: 0.5` (the arrival view) and space neighbours about 0.19 (portrait) to 0.25 (landscape) apart, so turning moves from one photo straight into the next. The fourth photo goes behind, at `u: 0.0` or `0.12`.
+- A tall facade can use `"v": 0.44, "hfov": 62` to show the whole building.
 
 ## 3. Build the spheres
 Write `spec.json` (format at the top of `scripts/collage.py`), then run:
@@ -26,10 +27,12 @@ Write `spec.json` (format at the top of `scripts/collage.py`), then run:
 python3 -I "<skill-dir>/scripts/collage.py" spec.json "<photos-dir>" "<project>/panos_src"
 python3 -I "<skill-dir>/scripts/prep_panos.py" "<project>/panos_src" "<project>/pano"
 ```
-Look at `pano/grid/<id>.jpg` for every place: no coloured rings or bands in the gaps, photos in the order you meant. Place the hotspots on those grids.
+The gaps are filled by push-pull averaging, so each gap continues the colours at the photo edges (sky above, floor below). Look at `pano/grid/<id>.jpg` for every place: no flat grey bands or coloured rings, photos in the order you meant. Place the hotspots on those grids.
 
 ## 4. Page settings for photo spheres
-In the template's module script set `FOV_PORTRAIT = 62, FOV_LANDSCAPE = 50, LAT_MAX = 0.42`. With the 360° values the photos fill only the middle of the screen and the top and bottom show blur.
+In the template's module script set `FOV_PORTRAIT = 64, FOV_LANDSCAPE = 52, LAT_MAX = 0.12`. With looser values the viewer sees the photo's top and bottom edges and the blur beyond them; a user on a phone reported those edges as the first problem.
+
+Verify by shooting each place turned left and right and tilted to the limit (`__tour.view.lat = -LAT_MAX`, never beyond, since the drag clamps there).
 
 ## 5. Honesty and publishing
 - Put "เดโม" in `<title>`, "เดโมจากรูปในเพจ" in the brand line, and a note in the info sheet: built from the page's photos, not real 360°, where each price came from.

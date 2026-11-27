@@ -29,7 +29,7 @@ The plan's three group boxes come from the array that starts `[[4, 2, 112, 34, '
 `{ key, name, beds, guests, price }`. Use the owner's real prices. `price: null` shows "สอบถามราคา" and the booking total says to ask in the chat. When prices are invented for a demo, the info sheet must say they are examples.
 
 ## Settings (top of the module script)
-- `FOV_PORTRAIT`, `FOV_LANDSCAPE`, `LAT_MAX`: 84, 72, 1.2 for real 360° panoramas; 62, 50, 0.42 for spheres built from flat photos.
+- `FOV_PORTRAIT`, `FOV_LANDSCAPE`, `LAT_MAX`: 84, 72, 1.2 for real 360° panoramas; 64, 52, 0.12 for spheres built from flat photos.
 - `MESSENGER`: the page username for `m.me/<name>`; empty keeps the demo toast.
 
 ## GROUPS and AUTO

@@ -2,9 +2,9 @@
 """Build a 2:1 equirectangular 'photo sphere' from flat photos of one place.
 Each photo is reprojected (gnomonic) to the direction it faces; gaps are filled with a
 soft blur of the neighbouring photos.  Usage: python3 -I collage.py SPEC.json PHOTOS_DIR OUT_DIR
+Needs numpy, scipy and Pillow. About 13 s per place at 4096x2048.
 SPEC: {"scene_id": [{"p": "p049.jpg", "u": 0.5, "v": 0.5, "hfov": 54}, ...], ...}
-u: 0..1 around (0.5 = straight ahead on arrival), v: 0.5 = horizon; hfov in degrees (default by aspect: 69 landscape / 54 portrait).
-Needs numpy, scipy and Pillow. About 13 s per place at 4096x2048."""
+u: 0..1 around (0.5 = straight ahead on arrival), v: 0.5 = horizon; hfov in degrees (default by aspect: 90 landscape / 70 portrait; wider than the real lens so each photo fills the phone screen top to bottom)."""
 import sys, json, math, pathlib
 import numpy as np
 from PIL import Image, ImageFilter
@@ -30,7 +30,7 @@ def place(img, uc, vc, hfov):
     x0 = xi.astype(int); y0 = yi.astype(int); fx = (xi - x0)[..., None]; fy = (yi - y0)[..., None]
     c = (a[y0, x0] * (1 - fx) * (1 - fy) + a[y0, x0 + 1] * fx * (1 - fy) + a[y0 + 1, x0] * (1 - fx) * fy + a[y0 + 1, x0 + 1] * fx * fy)
     # feather: distance to the photo edge, as a fraction of its half size
-    e = np.minimum(np.minimum(xi, pw - 1 - xi) / (pw * 0.06), np.minimum(yi, ph - 1 - yi) / (ph * 0.06))
+    e = np.minimum(np.minimum(xi, pw - 1 - xi) / (pw * 0.1), np.minimum(yi, ph - 1 - yi) / (ph * 0.1))
     m = np.where(ok, np.clip(e, 0, 1), 0).astype(np.float32)
     return c, m
 
@@ -39,22 +39,31 @@ for sid, items in spec.items():
     for it in items:
         img = Image.open(src / it["p"]).convert("RGB")
         if max(img.size) > 2048: img.thumbnail((2048, 2048), Image.LANCZOS)
-        hf = it.get("hfov") or (69.0 if img.width >= img.height else 54.0)
+        hf = it.get("hfov") or (90.0 if img.width >= img.height else 70.0)
         c, m = place(img, it["u"], it.get("v", 0.5), hf)
         m = m ** 1.5
         acc += c * m[..., None]; wsum += m
     sharp = acc / np.maximum(wsum, 1e-6)[..., None]; cover = np.clip(wsum, 0, 1)
-    # background: normalised blur of the photos at low resolution, wrapping left/right
+    # background: push-pull fill. Average the photos into ever smaller images (weighted by coverage),
+    # then fill each gap from the next coarser level, so the fill continues the colours at each photo edge.
     from scipy.ndimage import gaussian_filter, zoom
-    k = 8; sh, sw = H // k, W // k
-    cs = sharp[::k, ::k] * cover[::k, ::k, None]; ms = cover[::k, ::k]
-    def gb(a, s): return gaussian_filter(a, sigma=(s, s) + ((0,) if a.ndim == 3 else ()), mode=('nearest', 'wrap') + (('nearest',) if a.ndim == 3 else ()))
-    near = gb(cs, 22) / np.maximum(gb(ms, 22), 1e-4)[..., None]; wn = np.clip(gb(ms, 22) * 6, 0, 1)[..., None]
-    far = gb(cs, 70) / np.maximum(gb(ms, 70), 1e-4)[..., None]; wf = np.clip(gb(ms, 70) * 20, 0, 1)[..., None]
-    mean = (cs.sum((0, 1)) / max(ms.sum(), 1))
-    bgs = near * wn + (far * wf + mean * (1 - wf)) * (1 - wn)
-    bgs = bgs * 0.6 + 16
-    bg = zoom(bgs, (k, k, 1), order=1)[:H, :W]
+    k = 8; c0 = (sharp * cover[..., None])[::k, ::k].astype(np.float32); w0 = cover[::k, ::k].astype(np.float32)
+    def down(c, w):
+        h2, w2 = c.shape[0] // 2, c.shape[1] // 2
+        cs = c[:h2 * 2, :w2 * 2].reshape(h2, 2, w2, 2, 3).sum((1, 3)); ws = w[:h2 * 2, :w2 * 2].reshape(h2, 2, w2, 2).sum((1, 3))
+        return cs, ws          # premultiplied sums
+    def fill(c, w):            # c premultiplied by w
+        if min(w.shape) <= 2:
+            m = c.sum((0, 1)) / max(w.sum(), 1e-6); return np.broadcast_to(m, c.shape).copy()
+        cs, ws = down(c, w); coarse = fill(cs, ws)
+        up = zoom(coarse, (c.shape[0] / coarse.shape[0], c.shape[1] / coarse.shape[1], 1), order=1)
+        up = gaussian_filter(up, sigma=(1, 1, 0), mode=('nearest', 'wrap', 'nearest'))
+        a = np.clip(w, 0, 1)[..., None]
+        return (c / np.maximum(w, 1e-6)[..., None]) * a + up * (1 - a)
+    bgs = fill(c0, w0)
+    bgs = gaussian_filter(bgs, sigma=(6, 6, 0), mode=('nearest', 'wrap', 'nearest'))
+    bgs = bgs * 0.9 + 6                                       # a touch darker, so the photos stay the focus
+    bg = zoom(bgs, (H / bgs.shape[0], W / bgs.shape[1], 1), order=1)[:H, :W]
     outimg = sharp * cover[..., None] + bg * (1 - cover[..., None])
     Image.fromarray(np.uint8(np.clip(outimg, 0, 255))).save(out / f"{sid}.jpg", quality=88)
     print("OK", sid)
