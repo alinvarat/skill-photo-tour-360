@@ -1,6 +1,6 @@
 ---
 name: photo-tour-360
-description: Build a phone-first 360° photo walk-through for a homestay, hotel or other lodging from equirectangular panoramas, with arrows between places, a site plan, room list and a book-by-chat (Messenger/LINE) sheet, styled with clear see-through glass UI. Use when the user wants a 360/VR photo tour, virtual walk-through or "ทัวร์ 360" of a real place, or a sales demo of one. Not for code-built 3D rooms (threejs-archviz).
+description: Build a phone-first 360° photo walk-through for a homestay, hotel or other lodging from equirectangular panoramas, or from ordinary photos such as those on the property's Facebook page, with arrows between places, a site plan, room list and a book-by-chat (Messenger/LINE) sheet, styled with clear see-through glass UI. Use when the user wants a 360/VR photo tour, virtual walk-through or "ทัวร์ 360" of a real place, or a sales demo of one. Not for code-built 3D rooms (threejs-archviz).
 ---
 
 # 360° photo tour for a lodging
@@ -8,8 +8,10 @@ description: Build a phone-first 360° photo walk-through for a homestay, hotel 
 Done means: every place loads and links both ways, every arrow lands where its label says, the page has zero JS errors, it was checked in screenshots at phone and desktop size, and the report lists what is still unverified (real phone, real prices, real contact link).
 
 ## 1. Gather
-1. Get 2:1 equirectangular panoramas, one per place: the owner's own 360 photos (360 camera or phone panorama app). For a sales demo without owner photos, use CC0 panoramas (for example Poly Haven HDRI JPG previews) and say in the page and the report that they are stand-ins. Ask before downloading: list file names, source and total size.
-2. Write the place list: name, group (rooms / common / outside), which room type a bedroom belongs to, and which places connect to which. Get room types with beds, guests and prices, and the property's Messenger or LINE ID. Mark any value you invent as an example.
+1. Get 2:1 equirectangular panoramas, one per place: the owner's own 360 photos (360 camera or phone panorama app). Ask before downloading: list file names, source and total size.
+   - **When there are only ordinary photos** (for example a Facebook page with no 360° photos), read [flat-photos.md](references/flat-photos.md) and follow it; it adds a step that builds the panoramas from the photos, and changes the page settings.
+   - **When there are no photos of the property at all** and the user wants a generic sales demo, use CC0 panoramas (for example Poly Haven HDRI JPG previews) and say in the page and the report that they are stand-ins.
+2. Write the place list: name, group (rooms / common / outside), which room type a bedroom belongs to, and which places connect to which. Get room types with beds, guests and prices, and the property's Messenger page username. Use `price: null` for an unknown price. Mark any value you invent as an example.
 
 ## 2. Prepare the images
 Put the panoramas in one folder named by place id (`hotel_room.jpg`), then run:
@@ -20,7 +22,7 @@ It writes the full image, the fast preview (`lo/`), the dock thumbnail (`t-`) an
 
 ## 3. Build from the template
 1. Copy `assets/template.html` to `<project>/index.html`. Keep its loading code unchanged: it shows the 1024 px preview at once, decodes images off the main thread (`ImageBitmapLoader`), turns toward the target while loading, swaps in the 4096 px image after arrival, preloads neighbours and frees textures that are far away. These keep a tap-to-move under about 0.9 s.
-2. Fill the data as described in [data.md](references/data.md). Read each spot's `u`, `v` from `pano/grid/<id>.jpg`.
+2. Fill the data as described in [data.md](references/data.md), including the settings constants at the top of the module script (`FOV_PORTRAIT`, `FOV_LANDSCAPE`, `LAT_MAX`, `MESSENGER`). Read each spot's `u`, `v` from `pano/grid/<id>.jpg`.
 3. The UI is clear smoked glass. When restyling or changing it, follow the `clear-glass-ui` skill. When the page keeps its Hallmark stamp, run `sloplint` until clean after every edit.
 
 ## 4. Verify
@@ -31,5 +33,5 @@ It writes the full image, the fast preview (`lo/`), the dock thumbnail (`t-`) an
 5. Time a few moves when speed matters (headless SwiftShader numbers are slower than a real phone and are not phone results).
 
 ## 5. Publish and report
-1. Publish as a Claude artifact: the page is `index.html`; add every `pano/<id>.jpg`, `pano/lo/<id>.jpg` and `pano/t-<id>.jpg` in the `files` map at the same paths. Republish to the same URL for later versions, and back up the page (`index.vN.html`) before each change.
+1. When the page uses a real business's name or photos, keep it as local files until the user decides to publish. Publish as a Claude artifact: the page is `index.html`; add every `pano/<id>.jpg`, `pano/lo/<id>.jpg` and `pano/t-<id>.jpg` in the `files` map at the same paths. Republish to the same URL for later versions, and back up the page (`index.vN.html`) before each change.
 2. Report in at most three lines: the link and what changed, what was verified (screenshots, errors, timings), and what is unverified (real-phone smoothness, gyro inside the artifact frame, stand-in photos or example prices).

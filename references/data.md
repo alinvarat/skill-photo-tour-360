@@ -26,17 +26,18 @@ All data lives in the module script of `template.html`. Search for each constant
 The plan's three group boxes come from the array that starts `[[4, 2, 112, 34, 'ห้องพัก']` (`[x, y, w, h, label, outdoor?]`). Place each scene's `plan` dot inside its group's box, in roughly the real layout. The view cone is calibrated from the arrows automatically.
 
 ## ROOMS (what a guest books)
-`{ key, name, beds, guests, price }`. Use the owner's real prices. When prices are invented for a demo, the info sheet must say they are examples.
+`{ key, name, beds, guests, price }`. Use the owner's real prices. `price: null` shows "สอบถามราคา" and the booking total says to ask in the chat. When prices are invented for a demo, the info sheet must say they are examples.
+
+## Settings (top of the module script)
+- `FOV_PORTRAIT`, `FOV_LANDSCAPE`, `LAT_MAX`: 84, 72, 1.2 for real 360° panoramas; 62, 50, 0.42 for spheres built from flat photos.
+- `MESSENGER`: the page username for `m.me/<name>`; empty keeps the demo toast.
 
 ## GROUPS and AUTO
 - `GROUPS` names the dock tabs. Keep the keys; change only the Thai names when needed.
 - `AUTO` is the order for the auto tour. Start outside, end at the best view, visit each room type once.
 
 ## Contact
-The `send` button handler (search `$('send')`) shows a demo toast. For a real property, open the page's chat with the message filled in:
-- Messenger: `https://m.me/<PAGE_USERNAME>?text=<encodeURIComponent(message)>`
-- LINE OA: `https://line.me/R/oaMessage/<@LINE_ID>/?<encodeURIComponent(message)>`
-Use only the IDs the owner gives you.
+Set `MESSENGER` to open the page's chat with the message filled in (`https://m.me/<name>?text=…`). For LINE OA, change the `$('send')` handler to open `https://line.me/R/oaMessage/<@LINE_ID>/?<encodeURIComponent(message)>`. Use only IDs the owner gives or the page publicly shows.
 
 ## Text to replace
 Search the markup for the demo property name (`เรือนพักริมดอย`) and replace it everywhere: `<title>`, brand, cover heading and lead, cover meta line, info sheet facts (address, check-in times, contact), and the note that marks demo data.

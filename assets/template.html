@@ -283,6 +283,11 @@ import * as THREE from 'three';
 const $ = (id) => document.getElementById(id);
 document.documentElement.classList.add('js');
 const TAU = Math.PI * 2;
+// Real 360° panoramas: FOV_PORTRAIT 84, FOV_LANDSCAPE 72, LAT_MAX 1.2.
+// Spheres built from flat photos (scripts/collage.py): 62, 50 and 0.42, so the photos fill the screen.
+const FOV_PORTRAIT = 84, FOV_LANDSCAPE = 72, LAT_MAX = 1.2;
+// The property's Facebook page username (m.me/<name>). Empty: the send button shows a demo message instead.
+const MESSENGER = '';
 
 // u, v: where a spot sits in the equirectangular photo (0..1 from the left / top edge); plan: position on the site plan
 // group: which tab it belongs to; room: the room type a bedroom or its bathroom belongs to
@@ -350,7 +355,7 @@ const ROOMS = [
 const GROUPS = [{ key: 'rooms', name: 'ห้องพัก' }, { key: 'common', name: 'ส่วนกลาง' }, { key: 'out', name: 'ภายนอก' }];
 const byKey = Object.fromEntries(SCENES.map((s) => [s.key, s]));
 const roomOf = (k) => ROOMS.find((r) => r.key === k);
-const baht = (n) => '฿' + n.toLocaleString('th-TH');
+const baht = (n) => n == null ? 'สอบถามราคา' : '฿' + n.toLocaleString('th-TH'); // price: null when unknown
 // plan heading: line each arrow up with its neighbour on the plan (averaged over the scene's arrows)
 SCENES.forEach((s) => {
   let sx = 0, sy = 0;
@@ -379,7 +384,7 @@ const hiReady = {};
 const dirOf = (u, v, out = new THREE.Vector3()) => { const lon = u * TAU, lat = Math.PI / 2 - v * Math.PI; return out.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)); };
 const view = { lon: 0, lat: 0, fov: 75 };
 const portrait = () => canvas.clientWidth < canvas.clientHeight;
-const baseFov = () => (portrait() ? 84 : 72);
+const baseFov = () => (portrait() ? FOV_PORTRAIT : FOV_LANDSCAPE);
 const lookAt = (u, v) => { view.lon = u * TAU; view.lat = Math.PI / 2 - v * Math.PI; };
 let needs = true, cur = null, moving = false;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -485,7 +490,7 @@ async function go(key, from) {
   $('cap').textContent = s.cap;
   if (s.group !== tab) showTab(s.group); else markCurrent();
   const rt = s.room && roomOf(s.room);
-  $('cap-name').textContent = rt ? rt.name + ' ' + baht(rt.price) + ' ต่อคืน' : s.name;
+  $('cap-name').textContent = rt ? rt.name + ' ' + baht(rt.price) + (rt.price == null ? '' : ' ต่อคืน') : s.name;
   dockCta.textContent = rt ? 'จองห้องนี้' : 'ดูห้องพัก';
   dots.forEach((d, i) => d.classList.toggle('is-on', SCENES[i] === s));
   moving = false;
@@ -520,7 +525,7 @@ addEventListener('deviceorientation', (e) => {
   if (!gyro) return;
   const a = e.alpha * Math.PI / 180, b = e.beta * Math.PI / 180;
   if (!gyroBase) gyroBase = { a, lon: view.lon };
-  view.lon = gyroBase.lon - (a - gyroBase.a); view.lat = THREE.MathUtils.clamp(b - Math.PI / 2, -1.2, 1.2); needs = true;
+  view.lon = gyroBase.lon - (a - gyroBase.a); view.lat = THREE.MathUtils.clamp(b - Math.PI / 2, -LAT_MAX, LAT_MAX); needs = true;
 });
 gyroBtn.addEventListener('click', async () => {
   if (!gyro && typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) { try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return; } catch (_) { return; } }
@@ -547,13 +552,13 @@ canvas.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.id) return;
   const k = (view.fov / canvas.clientHeight) * Math.PI / 180, now = performance.now();
   view.lon = drag.lon - (e.clientX - drag.x) * k;
-  view.lat = THREE.MathUtils.clamp(drag.lat + (e.clientY - drag.y) * k, -1.2, 1.2);
+  view.lat = THREE.MathUtils.clamp(drag.lat + (e.clientY - drag.y) * k, -LAT_MAX, LAT_MAX);
   if (now > lastT) vel = -(e.clientX - lastX) * k / (now - lastT) * 16; lastX = e.clientX; lastT = now; needs = true;
 });
 const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (drag && e.pointerId === drag.id) { drag = null; if (performance.now() - lastT > 80) vel = 0; } idleT = performance.now(); };
 canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); firstTouch(); view.fov = THREE.MathUtils.clamp(view.fov + e.deltaY * 0.04, 32, baseFov() + 6); needs = true; }, { passive: false });
-canvas.addEventListener('keydown', (e) => { const d = { ArrowLeft: [-0.08, 0], ArrowRight: [0.08, 0], ArrowUp: [0, 0.06], ArrowDown: [0, -0.06] }[e.key]; if (!d) return; e.preventDefault(); firstTouch(); view.lon += d[0]; view.lat = THREE.MathUtils.clamp(view.lat + d[1], -1.2, 1.2); needs = true; });
+canvas.addEventListener('keydown', (e) => { const d = { ArrowLeft: [-0.08, 0], ArrowRight: [0.08, 0], ArrowUp: [0, 0.06], ArrowDown: [0, -0.06] }[e.key]; if (!d) return; e.preventDefault(); firstTouch(); view.lon += d[0]; view.lat = THREE.MathUtils.clamp(view.lat + d[1], -LAT_MAX, LAT_MAX); needs = true; });
 
 /* sheets, booking and toast */
 const sheets = { info: $('info'), book: $('book'), roomlist: $('roomlist') };
@@ -571,7 +576,7 @@ ROOMS.forEach((r, i) => {
   const im = new Image(); im.alt = ''; im.src = 'pano/t-' + byKey[r.key].id + '.jpg'; li.querySelector('.print').append(im);
   li.querySelector('.rrow__name').textContent = (i + 1) + ' ' + r.name;
   li.querySelector('.rrow__meta').textContent = r.beds + ' พักได้ ' + r.guests + ' ท่าน';
-  li.querySelector('.rrow__price').textContent = baht(r.price) + ' ต่อคืน';
+  li.querySelector('.rrow__price').textContent = baht(r.price) + (r.price == null ? ' ในแชท' : ' ต่อคืน');
   li.querySelector('[data-see]').addEventListener('click', () => { closeSheets(); go(r.key); });
   li.querySelector('[data-pick]').addEventListener('click', () => { book.room = r.key; openSheet('book'); });
   rlist.append(li);
@@ -591,7 +596,7 @@ function fillBook() {
   $('n-out').textContent = book.n; $('g-out').textContent = book.g;
   const rt = roomOf(book.room);
   pickEl.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.room === book.room)));
-  $('total').textContent = baht(rt.price * book.n);
+  $('total').textContent = rt.price == null ? 'สอบถามในแชท' : baht(rt.price * book.n);
   const out = iso(new Date(dateIn.value + 'T12:00:00').getTime() + book.n * DAY);
   $('msg').textContent = 'สวัสดีค่ะ สนใจ' + rt.name + '\nเข้าพัก ' + thDate(dateIn.value) + ' ถึง ' + thDate(out) + ' (' + book.n + ' คืน)\nผู้เข้าพัก ' + book.g + ' ท่าน ห้องว่างไหมคะ';
 }
@@ -600,7 +605,7 @@ document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('clic
 let toastT = 0;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 4200); }
 // in the real product this opens the property's Messenger or LINE chat with the message filled in
-$('send').addEventListener('click', () => { closeSheets(); toast('ของจริง ปุ่มนี้จะเปิดแชทเพจของที่พักพร้อมข้อความนี้ ลูกค้ากดส่งได้ทันที'); });
+$('send').addEventListener('click', () => { if (MESSENGER) { window.open('https://m.me/' + MESSENGER + '?text=' + encodeURIComponent($('msg').textContent), '_blank', 'noopener'); closeSheets(); return; } closeSheets(); toast('ของจริง ปุ่มนี้จะเปิดแชทเพจของที่พักพร้อมข้อความนี้ ลูกค้ากดส่งได้ทันที'); });
 
 /* cover */
 const cover = $('cover');
