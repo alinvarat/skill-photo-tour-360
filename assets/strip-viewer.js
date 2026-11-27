@@ -6,7 +6,8 @@ const MESSENGER = '';   // empty: the send button shows a demo message
 
 // Each place is a strip of the page's own photos, left to right; start: the photo shown on arrival.
 // Spots sit on a photo at x, y percent of its width and height.
-// STRIP: { key: { start: 1, photos: [{ p: 'p001', w: 1600, h: 1200, spots: [{ go: 'room1', label: 'เข้าห้อง', x: 50, y: 60 }, { tag: 'text', x: 30, y: 40 }] }] } }
+// STRIP: { key: { start: 1, photos: [{ p: 'p001', w: 1600, h: 1200, spots: [{ go: 'room1', label: 'เข้าห้อง', x: 50, y: 60 }, { tag: 'text', x: 30, y: 40 }],
+//   alts: { fog: 'p004', day: 'p001', dusk: 'p007', night: 'p021' }, mode: 'day' }] } }   (alts and mode optional)
 const STRIP = __STRIP__;
 const META = {   // one entry per place, same keys as STRIP; plan: dot position in the 120 x 120 site plan
   lawn: { group: 'out', name: 'สนามหน้าบ้าน', cap: 'one line about the place', plan: [16, 100] },
@@ -44,24 +45,84 @@ function hot(sp) {
   else { b.setAttribute('aria-label', sp.tag); b.tabIndex = -1; }
   return b;
 }
+// a photo with alts has real shots of the same view at other times of day; they sit on top and cross-fade
+const MODES = { fog: 'หมอกเช้า', day: 'กลางวัน', dusk: 'เย็น', night: 'ค่ำ' };
+let mode = null;   // null: every photo shows its own time
 function build(s) {
   strip.replaceChildren();
   s.photos.forEach((ph, i) => {
     const f = document.createElement('figure'); f.className = 'ph';
+    const inner = document.createElement('div'); inner.className = 'ph__in';
     const im = new Image(ph.w, ph.h); im.alt = s.name + ' มุมที่ ' + (i + 1); im.decoding = 'async'; im.src = src(ph.p);
-    f.append(im); ph.spots.forEach((sp) => f.append(hot(sp))); strip.append(f);
+    inner.append(im);
+    if (ph.alts) Object.entries(ph.alts).forEach(([m, p]) => { if (p === ph.p) return; const a = new Image(); a.alt = ''; a.className = 'ph__alt'; a.dataset.mode = m; a.decoding = 'async'; a.src = src(p); inner.append(a); });
+    ph.spots.forEach((sp) => inner.append(hot(sp)));
+    f.append(inner); strip.append(f);
+  });
+  applyMode(); buildDots();
+}
+function applyMode() {
+  [...strip.children].forEach((f, i) => { const ph = cur.photos[i]; if (!ph.alts) return; f.querySelectorAll('.ph__alt').forEach((a) => a.classList.toggle('is-on', mode === a.dataset.mode)); });
+  const ph = cur.photos[idx], el = $('times');
+  el.replaceChildren(); el.hidden = !ph.alts;
+  if (ph.alts) Object.keys(MODES).filter((m) => ph.alts[m]).forEach((m) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = MODES[m];
+    b.setAttribute('aria-pressed', String((mode && ph.alts[mode] ? mode : ph.mode) === m));
+    b.addEventListener('click', () => { stopAuto(); mode = m === ph.mode ? null : m; applyMode(); }); el.append(b);
+  });
+  bgEl.style.backgroundImage = 'url("' + src(ph.alts && mode && ph.alts[mode] ? ph.alts[mode] : ph.p) + '")';
+}
+function buildDots() {
+  const el = $('dots'); el.replaceChildren();
+  cur.photos.forEach((_, i) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'รูปที่ ' + (i + 1)); b.addEventListener('click', () => { stopAuto(); centre(i, true); }); el.append(b); });
+  markDot();
+}
+const markDot = () => [...$('dots').children].forEach((b, i) => b.setAttribute('aria-current', String(i === idx)));
+// depth: photos away from the centre sit back a little; the one in the middle drifts slowly
+function depth() {
+  const mid = strip.scrollLeft + strip.clientWidth / 2, w = strip.clientWidth;
+  [...strip.children].forEach((f, i) => {
+    const d = Math.min(1, Math.abs(f.offsetLeft + f.offsetWidth / 2 - mid) / w);
+    f.style.transform = 'scale(' + (1 - d * 0.1).toFixed(3) + ')'; f.style.opacity = (1 - d * 0.45).toFixed(3);
+    f.classList.toggle('is-centre', i === idx);
   });
 }
 const centre = (i, smooth) => { const f = strip.children[i]; if (!f) return; strip.scrollTo({ left: f.offsetLeft + f.offsetWidth / 2 - strip.clientWidth / 2, behavior: smooth && !reduce ? 'smooth' : 'instant' }); };
 function nearest() { const mid = strip.scrollLeft + strip.clientWidth / 2; let best = 0, d = 1e9; [...strip.children].forEach((f, i) => { const e = Math.abs(f.offsetLeft + f.offsetWidth / 2 - mid); if (e < d) { d = e; best = i; } }); return best; }
 let scrollRaf = 0;
-strip.addEventListener('scroll', () => { cancelAnimationFrame(scrollRaf); scrollRaf = requestAnimationFrame(() => { const i = nearest(); if (cur && i !== idx) { idx = i; setBg(); } }); }, { passive: true });
-function setBg() { bgEl.style.backgroundImage = 'url("' + src(cur.photos[idx].p) + '")'; }
+strip.addEventListener('scroll', () => { cancelAnimationFrame(scrollRaf); scrollRaf = requestAnimationFrame(() => { if (!cur) return; const i = nearest(); if (i !== idx) { idx = i; applyMode(); markDot(); } depth(); }); }, { passive: true });
 // the dock floats over the bottom; keep the photos above it so nothing hides behind it
-const fit = () => { strip.style.bottom = (innerHeight - dock.getBoundingClientRect().top + 12) + 'px'; if (cur) centre(idx); };
+const fit = () => { const b = innerHeight - dock.getBoundingClientRect().top; $('under').style.bottom = (b + 8) + 'px'; strip.style.bottom = (b + 84) + 'px'; if (cur) { centre(idx); depth(); } };
 new ResizeObserver(fit).observe(dock); addEventListener('resize', fit);
 strip.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); strip.scrollLeft += e.deltaY; } }, { passive: false });
-strip.addEventListener('pointerdown', () => { stopAuto(); hint.classList.add('is-gone'); });
+let downX = 0;
+strip.addEventListener('pointerdown', () => { stopAuto(); hint.classList.add('is-gone'); downX = strip.scrollLeft; });
+// tap a photo (not a swipe, not a hotspot) to see it full screen
+strip.addEventListener('click', (e) => { if (e.target.closest('.hot') || Math.abs(strip.scrollLeft - downX) > 6) return; const f = e.target.closest('.ph'); if (!f) return; const i = [...strip.children].indexOf(f); if (i !== idx) { centre(i, true); return; } const on = f.querySelector('.ph__alt.is-on'); openLb((on || f.querySelector('img')).src); });
+
+/* full-screen photo: double-tap or pinch to zoom, drag to look around */
+const lb = $('lb'), lbImg = new Image(); lbImg.alt = ''; lb.prepend(lbImg); const z = { s: 1, x: 0, y: 0 }; const lbPts = new Map(); let lbPinch = null, lbLast = 0;
+const lbApply = () => { lbImg.style.transform = 'translate(' + z.x + 'px,' + z.y + 'px) scale(' + z.s + ')'; };
+const lbClamp = () => { if (z.s <= 1) { z.s = 1; z.x = 0; z.y = 0; return; } const mx = lb.clientWidth * (z.s - 1) / 2, my = lb.clientHeight * (z.s - 1) / 2; z.x = Math.max(-mx, Math.min(mx, z.x)); z.y = Math.max(-my, Math.min(my, z.y)); };
+function openLb(u) { opener = document.activeElement; lbImg.src = u; z.s = 1; z.x = 0; z.y = 0; lbApply(); lb.hidden = false; stopAuto(); lb.querySelector('[data-lbclose]').focus(); }
+function closeLb() { lb.hidden = true; if (opener && opener.focus) opener.focus(); }
+lb.querySelector('[data-lbclose]').addEventListener('click', closeLb);
+lb.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('[data-lbclose]')) return; lb.setPointerCapture(e.pointerId); lbPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (lbPts.size === 2) { const [a, b] = [...lbPts.values()]; lbPinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: z.s }; }
+  const now = performance.now();
+  if (lbPts.size === 1 && now - lbLast < 300) { if (z.s > 1) { z.s = 1; z.x = 0; z.y = 0; } else { z.s = 2.5; z.x = -(e.clientX - lb.clientWidth / 2) * 1.5; z.y = -(e.clientY - lb.clientHeight / 2) * 1.5; lbClamp(); } lbImg.classList.add('is-ease'); lbApply(); }
+  lbLast = now;
+});
+lb.addEventListener('pointermove', (e) => {
+  const p = lbPts.get(e.pointerId); if (!p) return; lbImg.classList.remove('is-ease');
+  if (lbPinch && lbPts.size >= 2) { lbPts.set(e.pointerId, { x: e.clientX, y: e.clientY }); const [a, b] = [...lbPts.values()]; z.s = Math.max(1, Math.min(4, lbPinch.s * Math.hypot(a.x - b.x, a.y - b.y) / lbPinch.d)); lbClamp(); lbApply(); return; }
+  if (z.s > 1) { z.x += e.clientX - p.x; z.y += e.clientY - p.y; lbClamp(); lbApply(); }
+  lbPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+});
+const lbUp = (e) => { lbPts.delete(e.pointerId); if (lbPts.size < 2) lbPinch = null; };
+lb.addEventListener('pointerup', lbUp); lb.addEventListener('pointercancel', lbUp);
+lb.addEventListener('wheel', (e) => { e.preventDefault(); z.s = Math.max(1, Math.min(4, z.s * (e.deltaY < 0 ? 1.15 : 0.87))); lbClamp(); lbApply(); }, { passive: false });
 
 const preload = (p) => { const im = new Image(); im.src = src(p); return im.decode().catch(() => {}); };
 function warm() { const near = cur.photos.flatMap((p) => p.spots).filter((s) => s.go).map((s) => byKey[s.go]); near.forEach((n, k) => setTimeout(() => preload(n.photos[n.start].p), 200 + k * 250)); }
@@ -100,7 +161,7 @@ async function go(key) {
   const ready = preload(s.photos[s.start].p);
   if (!first) { strip.classList.add('is-out'); await Promise.all([sleep(reduce ? 0 : 200), Promise.race([ready, sleep(1500)])]); }
   else await ready;
-  cur = s; idx = s.start; build(s); centre(idx); setBg();
+  cur = s; idx = s.start; build(s); centre(idx); depth();
   strip.classList.remove('is-out');
   $('cap').textContent = s.cap;
   if (s.group !== tab) showTab(s.group); else markCurrent();
@@ -123,7 +184,10 @@ function autoStep() {
   clearTimeout(autoTimer);
   autoTimer = setTimeout(async () => {
     if (!auto) return;
-    if (idx < cur.photos.length - 1) centre(idx + 1, true);
+    const ph = cur.photos[idx], ms = ph.alts ? Object.keys(MODES).filter((m) => ph.alts[m]) : [];
+    const shown = mode && ph.alts && ph.alts[mode] ? mode : ph.mode, at = ms.indexOf(shown);
+    if (ms.length && at < ms.length - 1) { mode = ms[at + 1]; applyMode(); }
+    else if (idx < cur.photos.length - 1) { mode = null; centre(idx + 1, true); }
     else await go(AUTO[(AUTO.indexOf(cur.key) + 1) % AUTO.length]);
     if (auto) autoStep();
   }, 2800);
@@ -141,7 +205,7 @@ function openSheet(name) { opener = document.activeElement; Object.values(sheets
 function closeSheets() { Object.values(sheets).forEach((s) => { s.hidden = true; }); if (opener && opener.focus) opener.focus(); }
 $('info-open').addEventListener('click', () => openSheet('info'));
 Object.values(sheets).forEach((s) => s.addEventListener('click', (e) => { if (e.target === s || e.target.closest('[data-close]')) closeSheets(); }));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!lb.hidden) closeLb(); else closeSheets(); } });
 document.querySelectorAll('[data-rooms]').forEach((b) => b.addEventListener('click', () => openSheet('roomlist')));
 const rlist = $('rlist');
 ROOMS.forEach((r, i) => {
@@ -198,5 +262,5 @@ document.body.classList.add('is-cover');
     window.__ready = true;
   } catch (e) { $('cover-meta').textContent = 'โหลดภาพไม่สำเร็จ ลองเปิดใหม่อีกครั้ง'; window.__err = String(e); }
 })();
-window.__tour = { go, enter, startAuto, openSheet, centre, scenes: SCENES, state: () => ({ cur: cur && cur.key, idx, moving, auto }) };
+window.__tour = { go, enter, startAuto, openSheet, centre, openLb, setMode: (m) => { mode = m; applyMode(); }, scenes: SCENES, state: () => ({ cur: cur && cur.key, idx, mode, moving, auto }) };
 </script>
