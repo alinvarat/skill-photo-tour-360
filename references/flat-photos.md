@@ -1,6 +1,22 @@
 # Tour from ordinary photos (no 360° photos)
 
-Use this when the property has only normal photos, for example on its Facebook page. The result is a "photo sphere": several photos of one place placed around the viewer, with soft blur filling the gaps. It looks good on a phone, but it is not a real 360° capture. Say so on the page and in the report.
+Use this when the property has only normal photos, for example on its Facebook page. There are two ways to show them. Use the photo strip unless the user asks for the sphere.
+
+- **Photo strip (default).** Each place is a row of its photos at their real size with their real edges, swiped left and right; hotspots sit on the photos. Nothing is zoomed or invented. Build it as in "Photo strip" below.
+- **Photo sphere.** Several photos placed around the viewer in the three.js template, with blur filling the gaps (sections 2 to 4). The photos only fill the screen when zoomed in and the view is held almost level; a user rejected this as zooming to hide the edges. Use it only on request.
+
+Either way it is not a real 360° capture. Say so on the page and in the report.
+
+## Photo strip
+1. Collect and choose photos as in sections 1 and 2 (3 to 4 photos per place, left to right as you would turn; `start` is the arrival photo).
+2. Resize the chosen photos to at most 1600 px on the long side (quality 80) into `<project>/ph/<id>.jpg`, and make one 240 × 150 thumbnail per place, `ph/t-<place>.jpg`, from its start photo.
+3. Copy `assets/template.html` to `<project>/index.html`, then:
+   - replace everything from `<script type="importmap">` to the last `</script>` with `assets/strip-viewer.js`, filling `STRIP` (JSON with each photo's `w`, `h` and spots at `x`, `y` percent), `META`, `ROOMS`, `MESSENGER`;
+   - replace the `<canvas id="c" …>` line with `<div class="bg" id="bg" aria-hidden="true"></div><div class="strip" id="strip" tabindex="0" aria-label="…"></div>`, delete the gyro button, and change the hint text to "ปัดซ้ายขวาดูรูปอื่น";
+   - add `references/strip-css.css` to the stylesheet and delete the `canvas` rules.
+4. The viewer keeps the photos above the dock (it measures the dock), centres the start photo on arrival, fades between places, turns a vertical mouse wheel into sideways scrolling, and the auto tour steps through each photo before moving on.
+5. Verify with `shot.mjs`; `__tour.centre(i)` scrolls to photo i and `state()` reports `idx`. Shoot every place at 412 × 860 and 1440 × 900 and check that each arrow sits on what its label names.
+6. Publish `index.html` with every `ph/*.jpg`.
 
 ## 1. Collect the photos
 1. When the owner can send photos, use those. Otherwise, with the user's go-ahead, use the photos on the property's public page.

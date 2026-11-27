@@ -1,0 +1,9 @@
+/* Add to the template's stylesheet when using assets/strip-viewer.js. Tokens come from the template. */
+:root { --radius-photo: 6px; --shadow-photo: 0 18px 40px -18px var(--print-shade); }
+.bg { position: absolute; inset: -40px; background: var(--color-ink) center / cover no-repeat; filter: blur(28px) saturate(1.1) brightness(0.55); transition: background-image var(--dur-long) var(--ease-out); }
+.strip { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: stretch; gap: var(--space-sm); padding: calc(max(var(--space-sm), env(safe-area-inset-top)) + 56px) 40vw 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain; transition: opacity var(--dur-short) var(--ease-out); }
+.strip::-webkit-scrollbar { display: none; }
+.strip.is-out { opacity: 0; }
+.ph { position: relative; flex: none; height: 100%; margin: 0; scroll-snap-align: center; }
+.ph img { display: block; height: 100%; width: auto; border-radius: var(--radius-photo); box-shadow: var(--shadow-photo); user-select: none; -webkit-user-drag: none; }
+.ph .hot { position: absolute; }

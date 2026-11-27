@@ -9,7 +9,7 @@ Done means: every place loads and links both ways, every arrow lands where its l
 
 ## 1. Gather
 1. Get 2:1 equirectangular panoramas, one per place: the owner's own 360 photos (360 camera or phone panorama app). Ask before downloading: list file names, source and total size.
-   - **When there are only ordinary photos** (for example a Facebook page with no 360° photos), read [flat-photos.md](references/flat-photos.md) and follow it; it adds a step that builds the panoramas from the photos, and changes the page settings.
+   - **When there are only ordinary photos** (for example a Facebook page with no 360° photos), read [flat-photos.md](references/flat-photos.md) and follow it. By default each place becomes a swipeable strip of its photos (`assets/strip-viewer.js`) instead of a 360° sphere.
    - **When there are no photos of the property at all** and the user wants a generic sales demo, use CC0 panoramas (for example Poly Haven HDRI JPG previews) and say in the page and the report that they are stand-ins.
 2. Write the place list: name, group (rooms / common / outside), which room type a bedroom belongs to, and which places connect to which. Get room types with beds, guests and prices, and the property's Messenger page username. Use `price: null` for an unknown price. Mark any value you invent as an example.
 
